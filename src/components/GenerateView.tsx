@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Trash2, Sparkles, Loader2, ArrowUpCircle } from 'lucide-react';
+import { Trash2, Sparkles, Loader2, ArrowUpCircle, X, Download } from 'lucide-react';
 import { TiltCard } from './TiltCard';
 import { ImageUploader } from './ImageUploader';
 import { DrawingCanvas } from './DrawingCanvas';
@@ -21,9 +21,12 @@ interface Props {
 export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang }: Props) {
   const [prompt, setPrompt] = useState('');
   const [inputType, setInputType] = useState<'text' | 'image' | 'draw'>('text');
+  const [imageStyle, setImageStyle] = useState('none');
+  const [imageSize, setImageSize] = useState('1024x1024');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<GalleryItem | null>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const t = {
@@ -41,7 +44,17 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         waiting: 'Waiting for prompt',
         generating: 'Generating...',
         dragUp: 'Drag Up To Wall',
-        doodle: 'Generated Doodle'
+        doodle: 'Generated Doodle',
+        style: 'Style',
+        size: 'Size',
+        none: 'None',
+        anime: 'Anime',
+        photorealistic: 'Photorealistic',
+        digitalArt: 'Digital Art',
+        threeDRender: '3D Render',
+        sketch: 'Sketch',
+        download: 'Download',
+        close: 'Close'
     },
     zh: {
         input: '輸入',
@@ -57,7 +70,17 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         waiting: '等待提示詞',
         generating: '生成中...',
         dragUp: '向上拖曳至相片牆',
-        doodle: '生成的圖片'
+        doodle: '生成的圖片',
+        style: '風格',
+        size: '尺寸',
+        none: '無',
+        anime: '動漫',
+        photorealistic: '寫實',
+        digitalArt: '數位藝術',
+        threeDRender: '3D渲染',
+        sketch: '草圖',
+        download: '下載',
+        close: '關閉'
     }
   }[lang];
 
@@ -67,29 +90,175 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
     setError(null);
     clearPending();
     
+    let finalPrompt = prompt || 'Random aesthetic image';
+    if (imageStyle !== 'none') {
+        finalPrompt += `, in ${imageStyle} style`;
+    }
+    
+    const [width, height] = imageSize.split('x');
+
     try {
       let imageUrl = '';
       if (!apiUrl) {
-         await new Promise(r => setTimeout(r, 2000));
-         imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt || 'Random aesthetic doodle art')}?width=1024&height=1024&nologo=true`;
+         if (!process.env.GEMINI_API_KEY) {
+             throw new Error("GEMINI_API_KEY is missing. Add it to environment variables to use the built-in Gemini image model.");
+         }
+         const { GoogleGenAI } = await import('@google/genai');
+         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+         
+         let aspectRatio = '1:1';
+         if (imageSize === '1024x576') aspectRatio = '16:9';
+         if (imageSize === '576x1024') aspectRatio = '9:16';
+         
+         const parts: any[] = [];
+         let base64Source = '';
+         if (inputType === 'image' && images.length > 0) {
+             base64Source = images[0];
+         } else if (inputType === 'draw' && drawingCanvasRef.current) {
+             base64Source = drawingCanvasRef.current.toDataURL('image/png');
+         }
+         
+         if (base64Source) {
+             const [prefix, data] = base64Source.split(',');
+             const mimeType = prefix.match(/:(.*?);/)?.[1] || 'image/png';
+             parts.push({
+                 inlineData: {
+                     data: data,
+                     mimeType: mimeType
+                 }
+             });
+         }
+         parts.push({ text: finalPrompt });
+         
+         const response = await ai.models.generateContent({
+             model: 'gemini-2.5-flash-image',
+             contents: { parts },
+             config: {
+                 imageConfig: {
+                     aspectRatio: aspectRatio as any
+                 }
+             }
+         });
+         
+         let base64EncodeString = '';
+         for (const part of response.candidates?.[0]?.content?.parts || []) {
+             if (part.inlineData) {
+                 base64EncodeString = part.inlineData.data;
+                 break;
+             }
+         }
+         
+         if (!base64EncodeString) {
+             throw new Error('No image returned from Gemini API');
+         }
+         imageUrl = `data:image/png;base64,${base64EncodeString}`;
       } else {
-         const res = await fetch(apiUrl, {
+         const headers: Record<string, string> = {
+             'Content-Type': 'application/json'
+         };
+         if (apiKey) {
+             headers['Authorization'] = `Bearer ${apiKey}`;
+             headers['x-goog-api-key'] = apiKey; // fallback
+         }
+
+         let actualEndpoint = apiUrl;
+         let isChatCompletion = true;
+
+         try {
+             const infoRes = await fetch(apiUrl, { method: 'GET', headers: { 'Accept': 'application/json' } });
+             if (infoRes.ok) {
+                 const infoData = await infoRes.json();
+                 if (infoData && Array.isArray(infoData.endpoints)) {
+                     const imgEp = infoData.endpoints.find((e: string) => e.includes('/images/generations'));
+                     const chatEp = infoData.endpoints.find((e: string) => e.includes('/chat/completions'));
+                     const compEp = infoData.endpoints.find((e: string) => e.includes('POST') && e.includes('/completions') && !e.includes('/chat/'));
+                     
+                     let selectedPath = '';
+                     if (imgEp) { selectedPath = imgEp.split(' ')[1]; isChatCompletion = false; }
+                     else if (chatEp) { selectedPath = chatEp.split(' ')[1]; isChatCompletion = true; }
+                     else if (compEp) { selectedPath = compEp.split(' ')[1]; isChatCompletion = false; }
+
+                     if (selectedPath) {
+                         const urlObj = new URL(apiUrl);
+                         urlObj.pathname = selectedPath;
+                         actualEndpoint = urlObj.toString();
+                     }
+                 }
+             }
+         } catch (e) {
+             console.warn("Could not fetch endpoints info, falling back to heuristic", e);
+         }
+
+         if (actualEndpoint === apiUrl) {
+             if (apiUrl.endsWith('/v1') || apiUrl.endsWith('/v1/')) {
+                 actualEndpoint = apiUrl.replace(/\/$/, '') + '/chat/completions';
+             }
+             isChatCompletion = actualEndpoint.includes('/chat/completions');
+         }
+
+         let body: any = {};
+         if (isChatCompletion) {
+             body = {
+                 model: modelName || 'gemini-2.5-flash',
+                 messages: [
+                     {
+                         role: 'user',
+                         content: finalPrompt
+                     }
+                 ]
+             };
+             if (inputType === 'image' && images.length > 0) {
+                 body.messages[0].content = [
+                     { type: 'text', text: finalPrompt },
+                     { type: 'image_url', image_url: { url: images[0] } }
+                 ];
+             } else if (inputType === 'draw' && drawingCanvasRef.current) {
+                 body.messages[0].content = [
+                     { type: 'text', text: finalPrompt },
+                     { type: 'image_url', image_url: { url: drawingCanvasRef.current.toDataURL('image/png') } }
+                 ];
+             }
+         } else {
+             body = {
+                 model: modelName || 'dall-e-3',
+                 prompt: finalPrompt,
+                 n: 1,
+                 size: imageSize
+             };
+             if (inputType === 'image' && images.length > 0) {
+                 body.image = images[0];
+             } else if (inputType === 'draw' && drawingCanvasRef.current) {
+                 body.image = drawingCanvasRef.current.toDataURL('image/png');
+             }
+         }
+
+         const res = await fetch(actualEndpoint, {
              method: 'POST',
-             headers: {
-                 'Content-Type': 'application/json',
-                 'Authorization': `Bearer ${apiKey}`,
-                 'x-goog-api-key': apiKey
-             },
-             body: JSON.stringify({
-                 prompt: prompt || 'Generate image in doodle sketch style',
-                 model: modelName
-             })
+             headers,
+             body: JSON.stringify(body)
          });
          
          if (!res.ok) throw new Error(`API Error: ${res.status}`);
          const data = await res.json();
-         imageUrl = data?.data?.[0]?.url || data?.predictions?.[0]?.bytesBase64Encoded || data?.url || data?.image || `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt || 'Random aesthetic')}?nologo=true`;
-         if (data?.predictions?.[0]?.bytesBase64Encoded) {
+         
+         let extractedUrl = '';
+         const content = data?.choices?.[0]?.message?.content;
+         if (content) {
+             const mdMatch = content.match(/!\[.*?\]\((.*?)\)/);
+             const urlMatch = content.match(/https?:\/\/[^\s)]+/);
+             if (mdMatch) {
+                 extractedUrl = mdMatch[1];
+             } else if (content.startsWith('data:image')) {
+                 extractedUrl = content;
+             } else if (urlMatch) {
+                 extractedUrl = urlMatch[0];
+             } else {
+                 extractedUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(content.slice(0, 500))}?nologo=true&width=${width}&height=${height}`;
+             }
+         }
+         
+         imageUrl = extractedUrl || data?.data?.[0]?.url || data?.predictions?.[0]?.bytesBase64Encoded || data?.url || data?.image || `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt || 'Random aesthetic')}?nologo=true&width=${width}&height=${height}`;
+         if (data?.predictions?.[0]?.bytesBase64Encoded && !imageUrl.startsWith('data:')) {
              imageUrl = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
          }
       }
@@ -129,9 +298,9 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
   };
 
   return (
-    <div className="w-full h-full flex flex-col lg:flex-row gap-6">
+    <div className="w-full h-full flex flex-col-reverse lg:flex-row gap-6">
       {/* LEFT PANEL */}
-      <div className="w-full lg:w-[450px] bg-white border-4 border-black shadow-[8px_8px_0_0_#000] flex flex-col rounded-2xl overflow-hidden shrink-0 h-full">
+      <div className="w-full lg:w-[450px] bg-white border-4 border-black shadow-[8px_8px_0_0_#000] flex flex-col rounded-2xl overflow-hidden shrink-0 h-[45%] lg:h-full">
         <div className="border-b-4 border-black p-5 flex justify-between items-center bg-[#f8f9fa] bg-white/60 backdrop-blur-sm">
           <span className="text-xl font-black uppercase tracking-tight">{t.input}</span>
           <select 
@@ -165,6 +334,40 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                 <DrawingCanvas canvasRef={drawingCanvasRef} />
               </div>
             )}
+
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-black uppercase tracking-widest mb-2">
+                  {t.style}
+                </label>
+                <select 
+                  value={imageStyle}
+                  onChange={(e) => setImageStyle(e.target.value)}
+                  className="w-full border-4 border-black p-2 text-sm font-bold rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000]"
+                >
+                  <option value="none">{t.none}</option>
+                  <option value="anime">{t.anime}</option>
+                  <option value="photorealistic">{t.photorealistic}</option>
+                  <option value="digital art">{t.digitalArt}</option>
+                  <option value="3d render">{t.threeDRender}</option>
+                  <option value="sketch">{t.sketch}</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-black uppercase tracking-widest mb-2">
+                  {t.size}
+                </label>
+                <select 
+                  value={imageSize}
+                  onChange={(e) => setImageSize(e.target.value)}
+                  className="w-full border-4 border-black p-2 text-sm font-bold rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000]"
+                >
+                  <option value="1024x1024">1:1</option>
+                  <option value="1024x576">16:9</option>
+                  <option value="576x1024">9:16</option>
+                </select>
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-black uppercase tracking-widest mb-3">
@@ -220,7 +423,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         {/* The Wall Area (Gallery) */}
         <div className="absolute inset-0 z-20">
            {galleryItems.map((item, i) => (
-              <GalleryPhoto key={item.id} item={item} initialZ={i} />
+              <GalleryPhoto key={item.id} item={item} initialZ={i} onImageClick={setPreviewImage} />
            ))}
         </div>
 
@@ -230,7 +433,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
             <div className="relative flex flex-col items-center pb-8 pointer-events-auto">
               
               {/* Camera */}
-              <TiltCard className="z-20">
+              <TiltCard className="z-20 scale-75 sm:scale-90 lg:scale-100 origin-bottom">
                 <div className="w-72 h-48 bg-[#3d3d3d] rounded-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] relative border-b-8 border-[#2d2d2d] flex flex-col items-center justify-center group transform-gpu" style={{ transformStyle: 'preserve-3d' }}>
                   <div className="absolute top-4 left-4 w-12 h-8 bg-[#2d2d2d] rounded-md border border-[#4d4d4d] transition-transform duration-300" style={{ transform: 'translateZ(10px)' }}></div>
                   <div className="w-24 h-24 rounded-full border-[6px] border-[#2d2d2d] bg-[#1a1a1a] flex items-center justify-center shadow-inner relative transition-transform duration-500 ease-out group-hover:scale-105" style={{ transform: 'translateZ(25px)' }}>
@@ -264,6 +467,52 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
             </div>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8 bg-black/60 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
+          <div className="bg-white border-4 border-black flex flex-col rounded-2xl shadow-[12px_12px_0_0_#000] max-w-4xl w-full max-h-full overflow-hidden relative" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b-4 border-black bg-[#f8f9fa]">
+              <p className="font-black text-xl truncate pr-4">{previewImage.prompt}</p>
+              <button onClick={() => setPreviewImage(null)} className="p-2 border-4 border-black rounded-xl hover:bg-gray-200 transition-colors shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none bg-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-gray-100" style={{ backgroundImage: 'radial-gradient(#ddd 2px, transparent 2px)', backgroundSize: '30px 30px' }}>
+              <img src={previewImage.url} alt={previewImage.prompt} className="max-w-full max-h-[60vh] object-contain border-4 border-black rounded-xl shadow-[8px_8px_0_0_rgba(0,0,0,0.2)] bg-white" />
+            </div>
+            <div className="p-4 border-t-4 border-black flex justify-end bg-white">
+              <button 
+                onClick={async () => {
+                  try {
+                    const response = await fetch(previewImage.url);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `generated-${Date.now()}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  } catch(e) {
+                      const a = document.createElement('a');
+                      a.target = '_blank';
+                      a.href = previewImage.url;
+                      a.download = `generated-${Date.now()}.png`;
+                      a.click();
+                  }
+                }}
+                className="py-3 px-6 bg-[#FFCC00] text-black font-black uppercase text-lg border-4 border-black tracking-widest hover:bg-yellow-400 transition-colors rounded-xl shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none flex items-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                {t.download}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -311,7 +560,7 @@ function DraggablePendingPhoto({ pendingImage, handleDragEnd, t }: any) {
   );
 }
 
-function GalleryPhoto({ item, initialZ }: { item: GalleryItem, initialZ: number }) {
+function GalleryPhoto({ item, initialZ, onImageClick }: { key?: string; item: GalleryItem, initialZ: number, onImageClick: (item: GalleryItem) => void }) {
   const [zIndex, setZIndex] = useState(initialZ);
   
   const x = useMotionValue(window.innerWidth / 2 - 100);
@@ -333,6 +582,7 @@ function GalleryPhoto({ item, initialZ }: { item: GalleryItem, initialZ: number 
         whileHover={{ scale: 1.1, zIndex: 100 }}
         whileDrag={{ scale: 1.1, zIndex: 100 }}
         onDragStart={() => setZIndex(Date.now())}
+        onTap={() => onImageClick(item)}
         initial={{ y: window.innerHeight - 200, x: window.innerWidth / 2 - 100, scale: 1, opacity: 0 }}
         animate={{ y: item.y, x: item.x, scale: 0.6, rotateZ: item.rotation, opacity: 1 }}
         transition={{ type: "spring", stiffness: 120, damping: 14 }}

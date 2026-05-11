@@ -19,7 +19,7 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, on
     en: {
         settings: 'Settings',
         config: 'Configure your model and API endpoint.',
-        leaveBlank: 'Leave Base URL disabled/empty to use the fallback mock API.',
+        leaveBlank: 'Leave Base URL empty to use the built-in Gemini image model from AI Studio.',
         modelName: 'Model Name',
         baseUrl: 'Base URL',
         apiKey: 'API Key',
@@ -31,7 +31,7 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, on
     zh: {
         settings: '設定',
         config: '設定您的模型與 API 端點。',
-        leaveBlank: '留空則使用預設的模擬範例。',
+        leaveBlank: '留空則使用 AI Studio 內建的 Gemini 圖像模型。',
         modelName: '模型名稱',
         baseUrl: 'API 網址 (Base URL)',
         apiKey: 'API 金鑰',
