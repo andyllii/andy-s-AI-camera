@@ -56,8 +56,8 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, on
           <h2 className="text-2xl font-black uppercase tracking-tight">{t.settings}</h2>
         </div>
 
-        <div className="p-8 flex flex-col gap-6">
-          <div className="bg-white/60 backdrop-blur-sm border-2 border-black p-4 text-sm font-bold rounded-xl tracking-wide shadow-[4px_4px_0_0_#000]">
+        <div className="p-5 md:p-8 flex flex-col gap-5 md:gap-6">
+          <div className="bg-white/60 backdrop-blur-sm border-2 border-black p-3 md:p-4 text-sm font-bold rounded-xl tracking-wide shadow-[4px_4px_0_0_#000]">
             <p>{t.config}</p>
             <p className="mt-2 text-gray-600 font-medium">{t.leaveBlank}</p>
           </div>

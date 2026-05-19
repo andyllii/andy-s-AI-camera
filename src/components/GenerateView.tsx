@@ -319,15 +319,15 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
   };
 
   return (
-    <div className={`w-full h-full flex flex-col-reverse lg:flex-row gap-6 ${isDark ? 'text-white' : 'text-black'}`}>
+    <div className={`w-full h-full flex flex-col flex-1 lg:flex-row gap-4 lg:gap-6 ${isDark ? 'text-white' : 'text-black'}`}>
       {/* LEFT PANEL */}
-      <div className={`w-full lg:w-[450px] border-4 shadow-[8px_8px_0_0_#000] flex flex-col rounded-2xl overflow-hidden shrink-0 h-[45%] lg:h-full ${isDark ? 'bg-zinc-800 border-gray-600' : 'bg-white border-black'}`}>
-        <div className={`border-b-4 p-5 flex justify-between items-center backdrop-blur-sm ${isDark ? 'border-gray-600 bg-zinc-900/60' : 'border-black bg-white/60'}`}>
-          <span className="text-xl font-black uppercase tracking-tight">{t.input}</span>
+      <div className={`w-full lg:w-[450px] border-4 shadow-[4px_4px_0_0_#000] lg:shadow-[8px_8px_0_0_#000] flex flex-col rounded-2xl overflow-hidden shrink-0 flex-none lg:h-full ${isDark ? 'bg-zinc-800 border-gray-600' : 'bg-white border-black'}`}>
+        <div className={`border-b-4 p-4 lg:p-5 flex justify-between items-center backdrop-blur-sm ${isDark ? 'border-gray-600 bg-zinc-900/60' : 'border-black bg-white/60'}`}>
+          <span className="text-lg lg:text-xl font-black uppercase tracking-tight">{t.input}</span>
           <select 
             value={inputType} 
             onChange={(e) => setInputType(e.target.value as any)}
-            className={`border-4 p-2 text-sm font-bold rounded-xl backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-800/80 text-white border-gray-600' : 'bg-white/80 text-black border-black'}`}
+            className={`border-4 p-1.5 lg:p-2 text-xs lg:text-sm font-bold rounded-xl backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[2px_2px_0_0_#000] lg:shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-800/80 text-white border-gray-600' : 'bg-white/80 text-black border-black'}`}
           >
             <option value="text">{t.textToImage}</option>
             <option value="image">{t.imageToImage}</option>
@@ -494,7 +494,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
       </div>
 
       {/* RIGHT PANEL - Virtual Picture Wall and Camera */}
-      <div className={`flex-1 border-4 shadow-[8px_8px_0_0_rgba(0,0,0,0.1)] rounded-2xl flex flex-col relative overflow-hidden ${isDark ? 'bg-zinc-900 border-gray-700' : 'bg-[#f8f9fa] border-black'}`}
+      <div className={`flex-1 min-h-[70vh] lg:min-h-0 border-4 shadow-[8px_8px_0_0_rgba(0,0,0,0.1)] rounded-2xl flex flex-col relative overflow-hidden ${isDark ? 'bg-zinc-900 border-gray-700' : 'bg-[#f8f9fa] border-black'}`}
            style={{ backgroundImage: `radial-gradient(${isDark ? '#444' : '#ddd'} 2px, transparent 2px)`, backgroundSize: '30px 30px' }}>
          
          <div className="absolute inset-0 pointer-events-none z-10 p-6 opacity-30">
