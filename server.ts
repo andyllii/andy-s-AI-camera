@@ -3,8 +3,13 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { put } from "@vercel/blob";
 import dotenv from "dotenv";
+import pg from "pg";
 
 dotenv.config();
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL || "postgresql://neondb_owner:npg_kAymGIP9a7Rz@ep-wandering-glade-ao4itf5h-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
+});
 
 async function startServer() {
   const app = express();
@@ -74,6 +79,42 @@ async function startServer() {
       res.send(buffer);
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Failed to load image" });
+    }
+  });
+
+  // Templates API
+  app.get("/api/templates", async (req, res) => {
+    try {
+      const result = await pool.query("SELECT * FROM templates ORDER BY created_at DESC");
+      res.json(result.rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to fetch templates" });
+    }
+  });
+
+  app.post("/api/templates", async (req, res) => {
+    try {
+      const { title, description, prompt, image_url } = req.body;
+      if (!title || !prompt) {
+        return res.status(400).json({ error: "Title and prompt are required" });
+      }
+      const result = await pool.query(
+        "INSERT INTO templates (title, description, prompt, image_url) VALUES ($1, $2, $3, $4) RETURNING *",
+        [title, description || '', prompt, image_url || '']
+      );
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to create template" });
+    }
+  });
+
+  app.delete("/api/templates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query("DELETE FROM templates WHERE id = $1", [id]);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to delete template" });
     }
   });
 

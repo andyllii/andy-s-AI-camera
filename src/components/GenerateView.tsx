@@ -26,7 +26,7 @@ interface Props {
 
 export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang, theme, wallEffect = 'none', enableUpload = true }: Props) {
   const [prompt, setPrompt] = useState('');
-  const [inputType, setInputType] = useState<'text' | 'image' | 'draw' | 'attributes' | 'edit'>('text');
+  const [inputType, setInputType] = useState<'text' | 'image' | 'draw' | 'attributes' | 'edit' | 'template'>('text');
   const [attributesList, setAttributesList] = useState<{name: string, value: string}[]>([{name: '', value: ''}]);
   const [imageStyle, setImageStyle] = useState('none');
   const [imageSize, setImageSize] = useState('1024x1024');
@@ -39,6 +39,9 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
   const [showOriginal, setShowOriginal] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
 
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+
   const t = {
     en: {
         input: 'Input',
@@ -47,6 +50,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         drawToImage: 'Draw-to-Image',
         editToImage: 'Image Edit (Brush)',
         attributesMode: 'Attributes',
+        templateMode: 'Template',
         optional: 'Optional',
         addAttribute: 'Add Attribute',
         baseImages: 'Base Images',
@@ -81,6 +85,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         drawToImage: '繪畫轉圖片',
         editToImage: '圖片編輯 (筆刷)',
         attributesMode: '重點屬性',
+        templateMode: '模板',
         optional: '選填',
         addAttribute: '新增重點',
         baseImages: '參考圖片',
@@ -110,16 +115,31 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
     }
   }[lang];
 
+  React.useEffect(() => {
+    if (inputType === 'template' && templates.length === 0) {
+      fetch('/api/templates')
+        .then(res => res.json())
+        .then(data => {
+            if (Array.isArray(data)) setTemplates(data);
+        })
+        .catch(err => console.error(err));
+    }
+  }, [inputType]);
+
   const isDark = theme === 'dark';
 
   const handleGenerate = async () => {
     if (inputType === 'text' && !prompt.trim()) return;
+    if (inputType === 'template' && !selectedTemplate) return;
     if (inputType === 'attributes' && !attributesList.some(a => a.name.trim() || a.value.trim())) return;
     setIsGenerating(true);
     setError(null);
     clearPending();
     
     let basePrompt = inputType === 'attributes' ? attributesList.filter(a => a.name.trim() || a.value.trim()).map(a => `${a.name}: ${a.value}`).join(', ') : prompt;
+    if (inputType === 'template') {
+        basePrompt = selectedTemplate.prompt + (prompt ? ` ${prompt}` : '');
+    }
     let finalPrompt = basePrompt || 'Random aesthetic image';
     if (imageStyle !== 'none') {
         finalPrompt += `, in ${imageStyle} style`;
@@ -386,6 +406,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
             <option value="draw">{t.drawToImage}</option>
             <option value="attributes">{t.attributesMode}</option>
             <option value="edit">{t.editToImage}</option>
+            <option value="template">{t.templateMode}</option>
           </select>
         </div>
 
@@ -494,6 +515,33 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
               </div>
             )}
 
+            {inputType === 'template' && (
+              <div className="flex flex-col gap-4">
+                <label className="block text-sm font-black uppercase tracking-widest">Select Template</label>
+                <div className="grid grid-cols-2 gap-4 max-h-64 overflow-y-auto p-1">
+                   {templates.map(t => (
+                      <div key={t.id} onClick={() => setSelectedTemplate(t)} className={`flex flex-col cursor-pointer rounded-xl border-4 overflow-hidden relative transition-all shadow-[4px_4px_0_0_#000] hover:scale-105 active:scale-95 ${selectedTemplate?.id === t.id ? 'border-[#FFCC00] ring-4 ring-[#FFCC00]/50' : (isDark ? 'border-gray-600' : 'border-black')}`}>
+                         {t.image_url ? (
+                            <img src={t.image_url} alt={t.title} className="w-full h-24 object-cover border-b-4 border-inherit" />
+                         ) : (
+                            <div className="w-full h-24 flex items-center justify-center bg-gray-200 border-b-4 border-inherit text-xs text-gray-500 font-bold uppercase">No Image</div>
+                         )}
+                         <div className={`p-2 font-black text-xs uppercase truncate ${isDark ? 'bg-zinc-800 text-white' : 'bg-white text-black'}`}>{t.title}</div>
+                      </div>
+                   ))}
+                   {templates.length === 0 && <div className="col-span-2 text-center text-sm font-bold opacity-50 py-4">No templates found. Tell an admin to add some!</div>}
+                </div>
+                
+                <label className="block text-sm font-black uppercase tracking-widest mt-2">{t.prompt} <span className="opacity-50 tracking-normal ml-1 text-xs">({t.optional})</span></label>
+                <textarea 
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Additional details to add to the template..."
+                  className={`w-full h-20 p-4 backdrop-blur-sm border-4 rounded-xl font-bold text-sm focus:ring-4 focus:ring-[#FFCC00] outline-none transition-all resize-none shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-700/80 border-gray-600 text-white placeholder-gray-400' : 'bg-white/80 border-black text-black placeholder-gray-500'}`}
+                />
+              </div>
+            )}
+
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-black uppercase tracking-widest mb-2">
@@ -528,7 +576,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
               </div>
             </div>
 
-            {inputType !== 'attributes' && (
+            {inputType !== 'attributes' && inputType !== 'template' && (
               <div>
                 <label className="block text-sm font-black uppercase tracking-widest mb-3">
                   {t.prompt}

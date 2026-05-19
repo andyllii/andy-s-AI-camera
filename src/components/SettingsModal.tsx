@@ -121,6 +121,12 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, initialEna
           >
             {t.save}
           </button>
+          
+          <div className="flex justify-center mt-6">
+            <a href="/admin" className="text-xs font-bold text-gray-500 uppercase tracking-widest hover:text-black underline underline-offset-4 transition-colors">
+              Admin Dashboard
+            </a>
+          </div>
         </div>
       </div>
     </div>
