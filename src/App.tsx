@@ -17,11 +17,13 @@ export default function App() {
   const [apiUrl, setApiUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [modelName, setModelName] = useState('gemini-2.5-flash-image');
+  const [enableUpload, setEnableUpload] = useState(false);
 
-  const handleSettingsSave = (url: string, key: string, model: string) => {
+  const handleSettingsSave = (url: string, key: string, model: string, uploadEnabled: boolean) => {
     setApiUrl(url);
     setApiKey(key);
     setModelName(model);
+    setEnableUpload(uploadEnabled);
     setIsSettingsOpen(false);
   };
 
@@ -78,6 +80,7 @@ export default function App() {
           apiUrl={apiUrl} 
           apiKey={apiKey} 
           modelName={modelName}
+          enableUpload={enableUpload}
           onGenerateSuccess={(url, prompt, fullPrompt, originalImage) => setPendingImage({url, prompt, fullPrompt, originalImage})}
           pendingImage={pendingImage}
           clearPending={() => setPendingImage(null)}
@@ -101,6 +104,7 @@ export default function App() {
           initialUrl={apiUrl} 
           initialKey={apiKey} 
           initialModel={modelName}
+          initialEnableUpload={enableUpload}
           onSave={handleSettingsSave} 
           onClose={() => setIsSettingsOpen(false)} 
           lang={lang}

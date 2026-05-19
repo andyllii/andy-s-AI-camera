@@ -21,9 +21,10 @@ interface Props {
   lang: 'en' | 'zh';
   theme: 'light' | 'dark';
   wallEffect?: EffectType;
+  enableUpload?: boolean;
 }
 
-export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang, theme, wallEffect = 'none' }: Props) {
+export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang, theme, wallEffect = 'none', enableUpload = true }: Props) {
   const [prompt, setPrompt] = useState('');
   const [inputType, setInputType] = useState<'text' | 'image' | 'draw' | 'attributes' | 'edit'>('text');
   const [attributesList, setAttributesList] = useState<{name: string, value: string}[]>([{name: '', value: ''}]);
@@ -309,8 +310,31 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
          }
       }
       
+      let finalImageUrl = imageUrl;
+      
+      if (enableUpload) {
+          try {
+              const res = await fetch('/api/upload', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      base64: imageUrl,
+                      filename: `generated-${Date.now()}.png`
+                  })
+              });
+              const data = await res.json();
+              if (res.ok && data.url) {
+                  finalImageUrl = data.url;
+              } else {
+                  console.warn('Upload failed:', data.error);
+              }
+          } catch (err) {
+              console.warn('Upload failed:', err);
+          }
+      }
+
       const originalImage = (inputType === 'edit' && images.length > 0) ? images[0] : undefined;
-      onGenerateSuccess(imageUrl, basePrompt || 'Generated Image', fullInstruction, originalImage);
+      onGenerateSuccess(finalImageUrl, basePrompt || 'Generated Image', fullInstruction, originalImage);
     } catch (e: any) {
       setError(e.message || 'Generation failed');
     } finally {

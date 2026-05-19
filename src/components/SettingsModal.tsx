@@ -5,15 +5,17 @@ interface Props {
   initialUrl: string;
   initialKey: string;
   initialModel: string;
-  onSave: (url: string, key: string, model: string) => void;
+  initialEnableUpload: boolean;
+  onSave: (url: string, key: string, model: string, enableUpload: boolean) => void;
   onClose: () => void;
   lang: 'en' | 'zh';
 }
 
-export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, onClose, lang }: Props) {
+export function SettingsModal({ initialUrl, initialKey, initialModel, initialEnableUpload, onSave, onClose, lang }: Props) {
   const [url, setUrl] = useState(initialUrl);
   const [apiKey, setApiKey] = useState(initialKey);
   const [model, setModel] = useState(initialModel);
+  const [enableUpload, setEnableUpload] = useState(initialEnableUpload);
 
   const t = {
     en: {
@@ -23,6 +25,7 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, on
         modelName: 'Model Name',
         baseUrl: 'Base URL',
         apiKey: 'API Key',
+        enableUpload: 'Enable Auto Upload to Vercel storage',
         save: 'Save Settings',
         placeholderModel: 'e.g. gemini-2.5-flash-image',
         placeholderUrl: 'https://api.yourcustomdomain.com/v1/...',
@@ -35,6 +38,7 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, on
         modelName: '模型名稱',
         baseUrl: 'API 網址 (Base URL)',
         apiKey: 'API 金鑰',
+        enableUpload: '啟用自動上傳至雲端伺服器 (Vercel)',
         save: '儲存設定',
         placeholderModel: '例如 gemini-2.5-flash-image',
         placeholderUrl: 'https://api.yourcustomdomain.com/v1/...',
@@ -95,8 +99,24 @@ export function SettingsModal({ initialUrl, initialKey, initialModel, onSave, on
             />
           </div>
 
+          <div className="flex items-center gap-3 bg-white/60 p-4 border-2 border-black rounded-xl">
+            <label className="flex items-center gap-3 cursor-pointer w-full">
+              <div className="relative">
+                <input 
+                  type="checkbox" 
+                  className="sr-only" 
+                  checked={enableUpload}
+                  onChange={(e) => setEnableUpload(e.target.checked)}
+                />
+                <div className={`block w-14 h-8 rounded-full border-2 border-black transition-colors ${enableUpload ? 'bg-[#FFCC00]' : 'bg-gray-300'}`}></div>
+                <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full border-2 border-black transition-transform ${enableUpload ? 'translate-x-6' : 'translate-x-0'}`}></div>
+              </div>
+              <span className="font-bold text-sm select-none">{t.enableUpload}</span>
+            </label>
+          </div>
+
           <button 
-            onClick={() => onSave(url, apiKey, model)}
+            onClick={() => onSave(url, apiKey, model, enableUpload)}
             className="w-full py-4 mt-4 bg-black text-white font-black text-lg uppercase tracking-widest hover:bg-gray-800 transition-colors rounded-xl shadow-[6px_6px_0_0_#FFCC00] active:translate-x-1 active:translate-y-1 active:shadow-none"
           >
             {t.save}
