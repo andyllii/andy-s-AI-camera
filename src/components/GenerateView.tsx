@@ -1,8 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { Trash2, Sparkles, Loader2, ArrowUpCircle, X, Download } from 'lucide-react';
+import { Trash2, Sparkles, Loader2, ArrowUpCircle, X, Download, ArrowLeftRight, Copy } from 'lucide-react';
 import { TiltCard } from './TiltCard';
 import { ImageUploader } from './ImageUploader';
 import { DrawingCanvas } from './DrawingCanvas';
+import { MaskCanvas } from './MaskCanvas';
+import { ImageCompareSlider } from './ImageCompareSlider';
+import { EffectsOverlay, EffectType } from './EffectsOverlay';
 import { GalleryItem } from '../types';
 import { motion, useMotionValue, useVelocity, useTransform, useSpring } from 'motion/react';
 
@@ -10,18 +13,19 @@ interface Props {
   apiUrl: string;
   apiKey: string;
   modelName: string;
-  onGenerateSuccess: (url: string, prompt: string) => void;
-  pendingImage: {url: string, prompt: string} | null;
+  onGenerateSuccess: (url: string, prompt: string, fullPrompt?: string, originalImage?: string) => void;
+  pendingImage: {url: string, prompt: string, fullPrompt?: string, originalImage?: string} | null;
   clearPending: () => void;
   galleryItems: GalleryItem[];
   setGalleryItems: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
   lang: 'en' | 'zh';
   theme: 'light' | 'dark';
+  wallEffect?: EffectType;
 }
 
-export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang, theme }: Props) {
+export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang, theme, wallEffect = 'none' }: Props) {
   const [prompt, setPrompt] = useState('');
-  const [inputType, setInputType] = useState<'text' | 'image' | 'draw' | 'attributes'>('text');
+  const [inputType, setInputType] = useState<'text' | 'image' | 'draw' | 'attributes' | 'edit'>('text');
   const [attributesList, setAttributesList] = useState<{name: string, value: string}[]>([{name: '', value: ''}]);
   const [imageStyle, setImageStyle] = useState('none');
   const [imageSize, setImageSize] = useState('1024x1024');
@@ -30,6 +34,9 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
   const [images, setImages] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState<GalleryItem | null>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [showFullPrompt, setShowFullPrompt] = useState(false);
 
   const t = {
     en: {
@@ -37,11 +44,13 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         textToImage: 'Text-to-Image',
         imageToImage: 'Image-to-Image',
         drawToImage: 'Draw-to-Image',
+        editToImage: 'Image Edit (Brush)',
         attributesMode: 'Attributes',
         optional: 'Optional',
         addAttribute: 'Add Attribute',
         baseImages: 'Base Images',
         drawing: 'Drawing',
+        drawMask: 'Highlight Area to Edit',
         prompt: 'Prompt',
         placeholder: 'A photorealistic cat astronaut on Mars...',
         generate: 'Generate!',
@@ -59,18 +68,23 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         threeDRender: '3D Render',
         sketch: 'Sketch',
         download: 'Download',
-        close: 'Close'
+        close: 'Close',
+        compareOriginal: 'Compare with Original',
+        showFullPrompt: 'Show Complete Prompt',
+        copyPrompt: 'Copy'
     },
     zh: {
         input: '輸入',
         textToImage: '文字轉圖片',
         imageToImage: '圖片轉圖片',
         drawToImage: '繪畫轉圖片',
+        editToImage: '圖片編輯 (筆刷)',
         attributesMode: '重點屬性',
         optional: '選填',
         addAttribute: '新增重點',
         baseImages: '參考圖片',
         drawing: '繪圖',
+        drawMask: '標記修改區域',
         prompt: '提示詞',
         placeholder: '火星上逼真的太空貓咪...',
         generate: '生成！',
@@ -88,7 +102,10 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         threeDRender: '3D渲染',
         sketch: '草圖',
         download: '下載',
-        close: '關閉'
+        close: '關閉',
+        compareOriginal: '比對原圖',
+        showFullPrompt: '顯示完整提示詞',
+        copyPrompt: '複製'
     }
   }[lang];
 
@@ -107,6 +124,11 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         finalPrompt += `, in ${imageStyle} style`;
     }
     
+    let fullInstruction = `Mode: ${inputType}\nPrompt: ${finalPrompt}\nSize: ${imageSize}\nStyle: ${imageStyle}`;
+    if (images.length > 0) fullInstruction += `\nBase Image: Yes`;
+    if (inputType === 'draw' && drawingCanvasRef.current) fullInstruction += `\nDrawing: Yes`;
+    if (inputType === 'edit' && maskCanvasRef.current) fullInstruction += `\nMask: Yes`;
+
     const [width, height] = imageSize.split('x');
 
     try {
@@ -130,6 +152,9 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
              base64Source = drawingCanvasRef.current.toDataURL('image/png');
          } else if (inputType === 'attributes' && images.length > 0) {
              base64Source = images[0];
+         } else if (inputType === 'edit' && images.length > 0) {
+             base64Source = images[0];
+             // we could also extract maskCanvas data here if api supports it
          }
          
          if (base64Source) {
@@ -231,7 +256,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                      { type: 'text', text: finalPrompt },
                      { type: 'image_url', image_url: { url: drawingCanvasRef.current.toDataURL('image/png') } }
                  ];
-             } else if (inputType === 'attributes' && images.length > 0) {
+             } else if ((inputType === 'attributes' || inputType === 'edit') && images.length > 0) {
                  body.messages[0].content = [
                      { type: 'text', text: finalPrompt },
                      { type: 'image_url', image_url: { url: images[0] } }
@@ -248,7 +273,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                  body.image = images[0];
              } else if (inputType === 'draw' && drawingCanvasRef.current) {
                  body.image = drawingCanvasRef.current.toDataURL('image/png');
-             } else if (inputType === 'attributes' && images.length > 0) {
+             } else if ((inputType === 'attributes' || inputType === 'edit') && images.length > 0) {
                  body.image = images[0];
              }
          }
@@ -284,7 +309,8 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
          }
       }
       
-      onGenerateSuccess(imageUrl, basePrompt || 'Generated Image');
+      const originalImage = (inputType === 'edit' && images.length > 0) ? images[0] : undefined;
+      onGenerateSuccess(imageUrl, basePrompt || 'Generated Image', fullInstruction, originalImage);
     } catch (e: any) {
       setError(e.message || 'Generation failed');
     } finally {
@@ -308,9 +334,11 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         id: Date.now().toString(),
         url: pendingImage.url,
         prompt: pendingImage.prompt,
+        fullPrompt: pendingImage.fullPrompt,
         x: randomX,
         y: randomY,
-        rotation: randomRot
+        rotation: randomRot,
+        originalImage: pendingImage.originalImage
       };
 
       setGalleryItems([...galleryItems, newItem]);
@@ -333,6 +361,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
             <option value="image">{t.imageToImage}</option>
             <option value="draw">{t.drawToImage}</option>
             <option value="attributes">{t.attributesMode}</option>
+            <option value="edit">{t.editToImage}</option>
           </select>
         </div>
 
@@ -354,6 +383,34 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                   {t.drawing}
                 </label>
                 <DrawingCanvas canvasRef={drawingCanvasRef} />
+              </div>
+            )}
+
+            {inputType === 'edit' && (
+              <div className="flex flex-col gap-4">
+                {images.length === 0 ? (
+                  <div>
+                    <label className="block text-sm font-black uppercase tracking-widest mb-3">
+                      {t.baseImages}
+                    </label>
+                    <ImageUploader images={images} setImages={setImages} />
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="block text-sm font-black uppercase tracking-widest">
+                        {t.drawMask}
+                      </label>
+                      <button 
+                        onClick={() => setImages([])} 
+                        className="text-xs font-bold underline"
+                      >
+                        Change Image
+                      </button>
+                    </div>
+                    <MaskCanvas canvasRef={maskCanvasRef} backgroundImage={images[0]} />
+                  </div>
+                )}
               </div>
             )}
 
@@ -501,10 +558,12 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
              <h1 className={`text-4xl font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-black'}`}>{t.virtualWall}</h1>
          </div>
 
+         {wallEffect !== 'none' && <EffectsOverlay effect={wallEffect} />}
+
         {/* The Wall Area (Gallery) */}
         <div className="absolute inset-0 z-20">
            {galleryItems.map((item, i) => (
-              <GalleryPhoto key={item.id} item={item} initialZ={i} onImageClick={setPreviewImage} isDark={isDark} />
+              <GalleryPhoto key={item.id} item={item} initialZ={i} onImageClick={(item) => { setPreviewImage(item); setShowOriginal(false); setShowFullPrompt(false); }} isDark={isDark} />
            ))}
         </div>
 
@@ -551,18 +610,65 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
 
       {/* Preview Modal */}
       {previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8 bg-black/60 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
-          <div className={`border-4 flex flex-col rounded-2xl shadow-[12px_12px_0_0_#000] max-w-4xl w-full max-h-full overflow-hidden relative ${isDark ? 'bg-zinc-800 border-gray-600 text-white' : 'bg-white border-black text-black'}`} onClick={e => e.stopPropagation()}>
-            <div className={`flex justify-between items-center p-4 border-b-4 ${isDark ? 'border-gray-600 bg-zinc-900' : 'border-black bg-[#f8f9fa]'}`}>
-              <p className="font-black text-xl truncate pr-4">{previewImage.prompt}</p>
-              <button onClick={() => setPreviewImage(null)} className={`p-2 border-4 rounded-xl transition-colors shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none ${isDark ? 'border-gray-600 hover:bg-zinc-700 bg-zinc-800' : 'border-black hover:bg-gray-200 bg-white'}`}>
-                <X className="w-6 h-6" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8 bg-black/60 backdrop-blur-sm" onClick={() => { setPreviewImage(null); setShowOriginal(false); setShowFullPrompt(false); }}>
+          <div className={`border-4 flex flex-col rounded-2xl shadow-[12px_12px_0_0_#000] max-w-4xl w-full max-h-[90vh] overflow-hidden relative ${isDark ? 'bg-zinc-800 border-gray-600 text-white' : 'bg-white border-black text-black'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex flex-col p-4 border-b-4 ${isDark ? 'border-gray-600 bg-zinc-900' : 'border-black bg-[#f8f9fa]'}`}>
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  {showFullPrompt && previewImage.fullPrompt ? (
+                    <pre className="font-bold text-sm whitespace-pre-wrap font-mono m-0 overflow-auto max-h-32 p-2 bg-black/5 rounded-lg">{previewImage.fullPrompt}</pre>
+                  ) : (
+                    <p className="font-black text-xl break-words">{previewImage.prompt}</p>
+                  )}
+                </div>
+                <button onClick={() => { setPreviewImage(null); setShowOriginal(false); setShowFullPrompt(false); }} className={`shrink-0 p-2 border-4 rounded-xl transition-colors shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none ${isDark ? 'border-gray-600 hover:bg-zinc-700 bg-zinc-800' : 'border-black hover:bg-gray-200 bg-white'}`}>
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              {previewImage.fullPrompt && (
+                <div className="flex items-center gap-4 mt-4">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={showFullPrompt} 
+                      onChange={(e) => setShowFullPrompt(e.target.checked)}
+                      className="w-5 h-5 accent-[#FFCC00] rounded"
+                    />
+                    <span className="font-bold text-sm tracking-widest uppercase">{t.showFullPrompt}</span>
+                  </label>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(previewImage.fullPrompt || '')}
+                    className="flex items-center gap-1 text-sm font-bold uppercase hover:text-[#FFCC00] transition-colors"
+                    title={t.copyPrompt}
+                  >
+                    <Copy size={16} /> {t.copyPrompt}
+                  </button>
+                </div>
+              )}
             </div>
             <div className={`flex-1 overflow-auto p-6 flex items-center justify-center ${isDark ? 'bg-zinc-800/50' : 'bg-gray-100'}`} style={{ backgroundImage: `radial-gradient(${isDark ? '#555' : '#ddd'} 2px, transparent 2px)`, backgroundSize: '30px 30px' }}>
-              <img src={previewImage.url} alt={previewImage.prompt} className={`max-w-full max-h-[60vh] object-contain border-4 rounded-xl shadow-[8px_8px_0_0_rgba(0,0,0,0.2)] ${isDark ? 'border-gray-600 bg-zinc-800' : 'border-black bg-white'}`} />
+              {previewImage.originalImage && showOriginal ? (
+                 <div className={`w-full max-w-2xl h-[60vh] border-4 rounded-xl shadow-[8px_8px_0_0_rgba(0,0,0,0.2)] overflow-hidden ${isDark ? 'border-gray-600 bg-zinc-800' : 'border-black bg-white'}`}>
+                   <ImageCompareSlider originalImage={previewImage.originalImage} editedImage={previewImage.url} />
+                 </div>
+              ) : (
+                <img src={previewImage.url} alt={previewImage.prompt} className={`max-w-full max-h-[60vh] object-contain border-4 rounded-xl shadow-[8px_8px_0_0_rgba(0,0,0,0.2)] ${isDark ? 'border-gray-600 bg-zinc-800' : 'border-black bg-white'}`} />
+              )}
             </div>
-            <div className={`p-4 border-t-4 flex justify-end ${isDark ? 'border-gray-600 bg-zinc-900' : 'border-black bg-white'}`}>
+            <div className={`p-4 border-t-4 flex items-center justify-between ${isDark ? 'border-gray-600 bg-zinc-900' : 'border-black bg-white'}`}>
+              <div>
+                 {previewImage.originalImage && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={showOriginal} 
+                        onChange={(e) => setShowOriginal(e.target.checked)}
+                        className="w-5 h-5 accent-[#FFCC00] rounded"
+                      />
+                      <span className="font-bold text-sm tracking-widest uppercase">{t.compareOriginal}</span>
+                    </label>
+                 )}
+              </div>
               <button 
                 onClick={async () => {
                   try {
@@ -643,6 +749,8 @@ export function DraggablePendingPhoto({ pendingImage, handleDragEnd, t, isDark }
 
 function GalleryPhoto({ item, initialZ, onImageClick, isDark }: { key?: string; item: GalleryItem, initialZ: number, onImageClick: (item: GalleryItem) => void, isDark?: boolean }) {
   const [zIndex, setZIndex] = useState(initialZ);
+  const startPos = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
   
   const x = useMotionValue(window.innerWidth / 2 - 100);
   const y = useMotionValue(window.innerHeight - 200);
@@ -662,8 +770,22 @@ function GalleryPhoto({ item, initialZ, onImageClick, isDark }: { key?: string; 
         dragMomentum={false}
         whileHover={{ scale: 1.1, zIndex: 100 }}
         whileDrag={{ scale: 1.1, zIndex: 100 }}
-        onDragStart={() => setZIndex(Date.now())}
-        onTap={() => onImageClick(item)}
+        onDragStart={() => {
+            setZIndex(Date.now());
+            hasDragged.current = true;
+        }}
+        onPointerDown={(e) => {
+            startPos.current = { x: e.clientX, y: e.clientY };
+            hasDragged.current = false;
+        }}
+        onPointerUp={(e) => {
+            const dx = e.clientX - startPos.current.x;
+            const dy = e.clientY - startPos.current.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 5 && !hasDragged.current) {
+                onImageClick(item);
+            }
+        }}
         initial={{ y: window.innerHeight - 200, x: window.innerWidth / 2 - 100, scale: 1, opacity: 0 }}
         animate={{ y: item.y, x: item.x, scale: 0.6, rotateZ: item.rotation, opacity: 1 }}
         transition={{ type: "spring", stiffness: 120, damping: 14 }}
