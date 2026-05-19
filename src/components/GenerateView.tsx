@@ -16,11 +16,13 @@ interface Props {
   galleryItems: GalleryItem[];
   setGalleryItems: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
   lang: 'en' | 'zh';
+  theme: 'light' | 'dark';
 }
 
-export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang }: Props) {
+export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pendingImage, clearPending, galleryItems, setGalleryItems, lang, theme }: Props) {
   const [prompt, setPrompt] = useState('');
-  const [inputType, setInputType] = useState<'text' | 'image' | 'draw'>('text');
+  const [inputType, setInputType] = useState<'text' | 'image' | 'draw' | 'attributes'>('text');
+  const [attributesList, setAttributesList] = useState<{name: string, value: string}[]>([{name: '', value: ''}]);
   const [imageStyle, setImageStyle] = useState('none');
   const [imageSize, setImageSize] = useState('1024x1024');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -35,6 +37,9 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         textToImage: 'Text-to-Image',
         imageToImage: 'Image-to-Image',
         drawToImage: 'Draw-to-Image',
+        attributesMode: 'Attributes',
+        optional: 'Optional',
+        addAttribute: 'Add Attribute',
         baseImages: 'Base Images',
         drawing: 'Drawing',
         prompt: 'Prompt',
@@ -61,6 +66,9 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
         textToImage: '文字轉圖片',
         imageToImage: '圖片轉圖片',
         drawToImage: '繪畫轉圖片',
+        attributesMode: '重點屬性',
+        optional: '選填',
+        addAttribute: '新增重點',
         baseImages: '參考圖片',
         drawing: '繪圖',
         prompt: '提示詞',
@@ -84,13 +92,17 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
     }
   }[lang];
 
+  const isDark = theme === 'dark';
+
   const handleGenerate = async () => {
     if (inputType === 'text' && !prompt.trim()) return;
+    if (inputType === 'attributes' && !attributesList.some(a => a.name.trim() || a.value.trim())) return;
     setIsGenerating(true);
     setError(null);
     clearPending();
     
-    let finalPrompt = prompt || 'Random aesthetic image';
+    let basePrompt = inputType === 'attributes' ? attributesList.filter(a => a.name.trim() || a.value.trim()).map(a => `${a.name}: ${a.value}`).join(', ') : prompt;
+    let finalPrompt = basePrompt || 'Random aesthetic image';
     if (imageStyle !== 'none') {
         finalPrompt += `, in ${imageStyle} style`;
     }
@@ -116,6 +128,8 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
              base64Source = images[0];
          } else if (inputType === 'draw' && drawingCanvasRef.current) {
              base64Source = drawingCanvasRef.current.toDataURL('image/png');
+         } else if (inputType === 'attributes' && images.length > 0) {
+             base64Source = images[0];
          }
          
          if (base64Source) {
@@ -217,6 +231,11 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                      { type: 'text', text: finalPrompt },
                      { type: 'image_url', image_url: { url: drawingCanvasRef.current.toDataURL('image/png') } }
                  ];
+             } else if (inputType === 'attributes' && images.length > 0) {
+                 body.messages[0].content = [
+                     { type: 'text', text: finalPrompt },
+                     { type: 'image_url', image_url: { url: images[0] } }
+                 ];
              }
          } else {
              body = {
@@ -229,6 +248,8 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                  body.image = images[0];
              } else if (inputType === 'draw' && drawingCanvasRef.current) {
                  body.image = drawingCanvasRef.current.toDataURL('image/png');
+             } else if (inputType === 'attributes' && images.length > 0) {
+                 body.image = images[0];
              }
          }
 
@@ -263,7 +284,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
          }
       }
       
-      onGenerateSuccess(imageUrl, prompt || 'Generated Image');
+      onGenerateSuccess(imageUrl, basePrompt || 'Generated Image');
     } catch (e: any) {
       setError(e.message || 'Generation failed');
     } finally {
@@ -298,23 +319,24 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
   };
 
   return (
-    <div className="w-full h-full flex flex-col-reverse lg:flex-row gap-6">
+    <div className={`w-full h-full flex flex-col-reverse lg:flex-row gap-6 ${isDark ? 'text-white' : 'text-black'}`}>
       {/* LEFT PANEL */}
-      <div className="w-full lg:w-[450px] bg-white border-4 border-black shadow-[8px_8px_0_0_#000] flex flex-col rounded-2xl overflow-hidden shrink-0 h-[45%] lg:h-full">
-        <div className="border-b-4 border-black p-5 flex justify-between items-center bg-[#f8f9fa] bg-white/60 backdrop-blur-sm">
+      <div className={`w-full lg:w-[450px] border-4 shadow-[8px_8px_0_0_#000] flex flex-col rounded-2xl overflow-hidden shrink-0 h-[45%] lg:h-full ${isDark ? 'bg-zinc-800 border-gray-600' : 'bg-white border-black'}`}>
+        <div className={`border-b-4 p-5 flex justify-between items-center backdrop-blur-sm ${isDark ? 'border-gray-600 bg-zinc-900/60' : 'border-black bg-white/60'}`}>
           <span className="text-xl font-black uppercase tracking-tight">{t.input}</span>
           <select 
             value={inputType} 
             onChange={(e) => setInputType(e.target.value as any)}
-            className="border-4 border-black p-2 text-sm font-bold rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] text-black cursor-pointer shadow-[4px_4px_0_0_#000]"
+            className={`border-4 p-2 text-sm font-bold rounded-xl backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-800/80 text-white border-gray-600' : 'bg-white/80 text-black border-black'}`}
           >
             <option value="text">{t.textToImage}</option>
             <option value="image">{t.imageToImage}</option>
             <option value="draw">{t.drawToImage}</option>
+            <option value="attributes">{t.attributesMode}</option>
           </select>
         </div>
 
-        <div className="p-6 flex flex-col gap-6 flex-1 overflow-y-auto bg-white/40 backdrop-blur-md">
+        <div className={`p-6 flex flex-col gap-6 flex-1 overflow-y-auto backdrop-blur-md ${isDark ? 'bg-zinc-800/40' : 'bg-white/40'}`}>
           <div className="flex-col flex gap-6">
             
             {inputType === 'image' && (
@@ -335,6 +357,62 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
               </div>
             )}
 
+            {inputType === 'attributes' && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-sm font-black uppercase tracking-widest mb-3">
+                    {t.baseImages} <span className="opacity-50 tracking-normal ml-1 text-xs">({t.optional})</span>
+                  </label>
+                  <ImageUploader images={images} setImages={setImages} />
+                </div>
+                <div>
+                  <label className="block text-sm font-black uppercase tracking-widest mb-3">
+                    {t.attributesMode}
+                  </label>
+                  <div className="flex flex-col gap-3">
+                    {attributesList.map((attr, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={attr.name} 
+                          onChange={e => {
+                            const newAttrs = [...attributesList];
+                            newAttrs[index].name = e.target.value;
+                            setAttributesList(newAttrs);
+                          }} 
+                          className={`flex-1 p-3 backdrop-blur-sm border-4 rounded-xl font-bold text-sm focus:ring-4 focus:ring-[#FFCC00] outline-none transition-all shadow-[2px_2px_0_0_#000] ${isDark ? 'bg-zinc-700/80 border-gray-600 text-white placeholder-gray-400' : 'bg-white/80 border-black text-black placeholder-gray-500'}`}
+                          placeholder={lang === 'en' ? 'e.g. Subject' : '例如：主體'}
+                        />
+                        <input 
+                          type="text" 
+                          value={attr.value} 
+                          onChange={e => {
+                            const newAttrs = [...attributesList];
+                            newAttrs[index].value = e.target.value;
+                            setAttributesList(newAttrs);
+                          }} 
+                          className={`flex-[2] p-3 backdrop-blur-sm border-4 rounded-xl font-bold text-sm focus:ring-4 focus:ring-[#FFCC00] outline-none transition-all shadow-[2px_2px_0_0_#000] ${isDark ? 'bg-zinc-700/80 border-gray-600 text-white placeholder-gray-400' : 'bg-white/80 border-black text-black placeholder-gray-500'}`}
+                          placeholder={lang === 'en' ? 'e.g. A cute dog' : '例如：一隻可愛的狗'}
+                        />
+                        <button 
+                          onClick={() => setAttributesList(attributesList.filter((_, i) => i !== index))} 
+                          className={`p-3 border-4 rounded-xl transition-colors shadow-[2px_2px_0_0_#000] flex items-center ${isDark ? 'border-gray-600 hover:bg-red-500/80 bg-zinc-700' : 'border-black hover:bg-red-400 bg-white'}`}
+                        >
+                          <Trash2 className="w-5 h-5"/>
+                        </button>
+                      </div>
+                    ))}
+                    <button 
+                      onClick={() => setAttributesList([...attributesList, {name: '', value: ''}])} 
+                      className={`w-full py-3 border-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-colors shadow-[4px_4px_0_0_#000] mt-1 ${isDark ? 'border-gray-600 hover:bg-zinc-700 bg-zinc-800' : 'border-black hover:bg-gray-100 bg-white'}`}
+                    >
+                      + {t.addAttribute}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-black uppercase tracking-widest mb-2">
@@ -343,7 +421,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                 <select 
                   value={imageStyle}
                   onChange={(e) => setImageStyle(e.target.value)}
-                  className="w-full border-4 border-black p-2 text-sm font-bold rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000]"
+                  className={`w-full border-4 p-2 text-sm font-bold rounded-xl backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-800/80 border-gray-600 text-white' : 'bg-white/80 border-black text-black'}`}
                 >
                   <option value="none">{t.none}</option>
                   <option value="anime">{t.anime}</option>
@@ -360,7 +438,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                 <select 
                   value={imageSize}
                   onChange={(e) => setImageSize(e.target.value)}
-                  className="w-full border-4 border-black p-2 text-sm font-bold rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000]"
+                  className={`w-full border-4 p-2 text-sm font-bold rounded-xl backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-[#FFCC00] cursor-pointer shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-800/80 border-gray-600 text-white' : 'bg-white/80 border-black text-black'}`}
                 >
                   <option value="1024x1024">1:1</option>
                   <option value="1024x576">16:9</option>
@@ -369,26 +447,28 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-black uppercase tracking-widest mb-3">
-                {t.prompt}
-              </label>
-              <textarea 
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder={t.placeholder}
-                className="w-full h-32 p-4 bg-white/80 backdrop-blur-sm border-4 border-black rounded-xl font-bold text-sm focus:ring-4 focus:ring-[#FFCC00] outline-none transition-all resize-none shadow-[4px_4px_0_0_#000]"
-              />
-            </div>
+            {inputType !== 'attributes' && (
+              <div>
+                <label className="block text-sm font-black uppercase tracking-widest mb-3">
+                  {t.prompt}
+                </label>
+                <textarea 
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={t.placeholder}
+                  className={`w-full h-32 p-4 backdrop-blur-sm border-4 rounded-xl font-bold text-sm focus:ring-4 focus:ring-[#FFCC00] outline-none transition-all resize-none shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-700/80 border-gray-600 text-white placeholder-gray-400' : 'bg-white/80 border-black text-black placeholder-gray-500'}`}
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 flex gap-4 border-t-4 border-black bg-white/60 backdrop-blur-sm mt-auto">
+        <div className={`p-6 flex gap-4 border-t-4 backdrop-blur-sm mt-auto ${isDark ? 'border-gray-600 bg-zinc-900/60' : 'border-black bg-white/60'}`}>
           <button 
             onClick={handleGenerate}
-            disabled={isGenerating || (inputType === 'text' && !prompt.trim())}
-            className="flex-1 py-4 bg-[#FFCC00] text-black font-black uppercase text-lg border-4 border-black tracking-widest hover:bg-yellow-400 transition-colors rounded-xl shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            disabled={isGenerating || (inputType === 'text' && !prompt.trim()) || (inputType === 'attributes' && !attributesList.some(a => a.name.trim() || a.value.trim()))}
+            className={`flex-1 py-4 bg-[#FFCC00] text-black font-black uppercase text-lg border-4 tracking-widest transition-colors rounded-xl shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 ${isDark ? 'hover:bg-[#e6b800] border-gray-600' : 'hover:bg-yellow-400 border-black'}`}
           >
             {isGenerating ? <Loader2 className="animate-spin w-6 h-6" /> : t.generate}
           </button>
@@ -396,6 +476,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
             onClick={() => {
                 setPrompt('');
                 setImages([]);
+                setAttributesList([{name: '', value: ''}]);
                 if (drawingCanvasRef.current) {
                     const ctx = drawingCanvasRef.current.getContext('2d');
                     if (ctx) {
@@ -404,7 +485,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                     }
                 }
             }}
-            className="px-5 border-4 border-black hover:bg-gray-200 transition-colors rounded-xl bg-white shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none"
+            className={`px-5 border-4 transition-colors rounded-xl shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none ${isDark ? 'border-gray-600 hover:bg-zinc-700 bg-zinc-800 text-white' : 'border-black hover:bg-gray-200 bg-white text-black'}`}
             title="Clear all"
           >
             <Trash2 className="w-6 h-6" />
@@ -413,17 +494,17 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
       </div>
 
       {/* RIGHT PANEL - Virtual Picture Wall and Camera */}
-      <div className="flex-1 bg-[#f8f9fa] border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,0.1)] rounded-2xl flex flex-col relative overflow-hidden"
-           style={{ backgroundImage: 'radial-gradient(#ddd 2px, transparent 2px)', backgroundSize: '30px 30px' }}>
+      <div className={`flex-1 border-4 shadow-[8px_8px_0_0_rgba(0,0,0,0.1)] rounded-2xl flex flex-col relative overflow-hidden ${isDark ? 'bg-zinc-900 border-gray-700' : 'bg-[#f8f9fa] border-black'}`}
+           style={{ backgroundImage: `radial-gradient(${isDark ? '#444' : '#ddd'} 2px, transparent 2px)`, backgroundSize: '30px 30px' }}>
          
          <div className="absolute inset-0 pointer-events-none z-10 p-6 opacity-30">
-             <h1 className="text-4xl font-black uppercase tracking-widest text-black">{t.virtualWall}</h1>
+             <h1 className={`text-4xl font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-black'}`}>{t.virtualWall}</h1>
          </div>
 
         {/* The Wall Area (Gallery) */}
         <div className="absolute inset-0 z-20">
            {galleryItems.map((item, i) => (
-              <GalleryPhoto key={item.id} item={item} initialZ={i} onImageClick={setPreviewImage} />
+              <GalleryPhoto key={item.id} item={item} initialZ={i} onImageClick={setPreviewImage} isDark={isDark} />
            ))}
         </div>
 
@@ -449,16 +530,16 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
 
               {/* Generated Image Output */}
               {isGenerating ? (
-                <div className="absolute -top-32 flex flex-col items-center gap-2 text-black bg-white/80 p-4 rounded-xl border-4 border-black">
+                <div className={`absolute -top-32 flex flex-col items-center gap-2 p-4 rounded-xl border-4 ${isDark ? 'bg-zinc-800/80 border-gray-600 text-white' : 'bg-white/80 border-black text-black'}`}>
                   <Loader2 className="w-8 h-8 animate-spin" />
                   <p className="font-black uppercase tracking-widest text-xs">{t.generating}</p>
                 </div>
               ) : error ? (
-                <div className="absolute -top-32 bg-white text-red-500 font-bold p-4 text-center border-4 border-black rounded-xl shadow-[4px_4px_0_0_#000]">{error}</div>
+                <div className={`absolute -top-32 font-bold p-4 text-center border-4 rounded-xl shadow-[4px_4px_0_0_#000] ${isDark ? 'bg-zinc-800 border-gray-600 text-red-400' : 'bg-white border-black text-red-500'}`}>{error}</div>
               ) : pendingImage ? (
-                <DraggablePendingPhoto pendingImage={pendingImage} handleDragEnd={handleDragEnd} t={t} />
+                <DraggablePendingPhoto pendingImage={pendingImage} handleDragEnd={handleDragEnd} t={t} isDark={isDark} />
               ) : (
-                <div className="absolute -top-20 flex flex-col items-center gap-2 text-gray-500 bg-white/90 px-6 py-3 rounded-full border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,0.2)]">
+                <div className={`absolute -top-20 flex flex-col items-center gap-2 px-6 py-3 rounded-full border-4 shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] ${isDark ? 'bg-zinc-800/90 border-gray-600 text-gray-300' : 'bg-white/90 border-black text-gray-500'}`}>
                   <Sparkles className="w-6 h-6" />
                   <p className="font-black uppercase tracking-widest text-[10px]">{t.waiting}</p>
                 </div>
@@ -471,17 +552,17 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
       {/* Preview Modal */}
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8 bg-black/60 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
-          <div className="bg-white border-4 border-black flex flex-col rounded-2xl shadow-[12px_12px_0_0_#000] max-w-4xl w-full max-h-full overflow-hidden relative" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-4 border-b-4 border-black bg-[#f8f9fa]">
+          <div className={`border-4 flex flex-col rounded-2xl shadow-[12px_12px_0_0_#000] max-w-4xl w-full max-h-full overflow-hidden relative ${isDark ? 'bg-zinc-800 border-gray-600 text-white' : 'bg-white border-black text-black'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex justify-between items-center p-4 border-b-4 ${isDark ? 'border-gray-600 bg-zinc-900' : 'border-black bg-[#f8f9fa]'}`}>
               <p className="font-black text-xl truncate pr-4">{previewImage.prompt}</p>
-              <button onClick={() => setPreviewImage(null)} className="p-2 border-4 border-black rounded-xl hover:bg-gray-200 transition-colors shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none bg-white">
+              <button onClick={() => setPreviewImage(null)} className={`p-2 border-4 rounded-xl transition-colors shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none ${isDark ? 'border-gray-600 hover:bg-zinc-700 bg-zinc-800' : 'border-black hover:bg-gray-200 bg-white'}`}>
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-gray-100" style={{ backgroundImage: 'radial-gradient(#ddd 2px, transparent 2px)', backgroundSize: '30px 30px' }}>
-              <img src={previewImage.url} alt={previewImage.prompt} className="max-w-full max-h-[60vh] object-contain border-4 border-black rounded-xl shadow-[8px_8px_0_0_rgba(0,0,0,0.2)] bg-white" />
+            <div className={`flex-1 overflow-auto p-6 flex items-center justify-center ${isDark ? 'bg-zinc-800/50' : 'bg-gray-100'}`} style={{ backgroundImage: `radial-gradient(${isDark ? '#555' : '#ddd'} 2px, transparent 2px)`, backgroundSize: '30px 30px' }}>
+              <img src={previewImage.url} alt={previewImage.prompt} className={`max-w-full max-h-[60vh] object-contain border-4 rounded-xl shadow-[8px_8px_0_0_rgba(0,0,0,0.2)] ${isDark ? 'border-gray-600 bg-zinc-800' : 'border-black bg-white'}`} />
             </div>
-            <div className="p-4 border-t-4 border-black flex justify-end bg-white">
+            <div className={`p-4 border-t-4 flex justify-end ${isDark ? 'border-gray-600 bg-zinc-900' : 'border-black bg-white'}`}>
               <button 
                 onClick={async () => {
                   try {
@@ -504,7 +585,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
                       a.click();
                   }
                 }}
-                className="py-3 px-6 bg-[#FFCC00] text-black font-black uppercase text-lg border-4 border-black tracking-widest hover:bg-yellow-400 transition-colors rounded-xl shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none flex items-center gap-2"
+                className={`py-3 px-6 bg-[#FFCC00] text-black font-black uppercase text-lg border-4 tracking-widest transition-colors rounded-xl shadow-[4px_4px_0_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none flex items-center gap-2 ${isDark ? 'border-gray-600 hover:bg-[#e6b800]' : 'border-black hover:bg-yellow-400'}`}
               >
                 <Download className="w-5 h-5" />
                 {t.download}
@@ -517,7 +598,7 @@ export function GenerateView({ apiUrl, apiKey, modelName, onGenerateSuccess, pen
   );
 }
 
-function DraggablePendingPhoto({ pendingImage, handleDragEnd, t }: any) {
+export function DraggablePendingPhoto({ pendingImage, handleDragEnd, t, isDark }: any) {
   const x = useMotionValue(0);
   const y = useMotionValue(80);
 
@@ -542,14 +623,14 @@ function DraggablePendingPhoto({ pendingImage, handleDragEnd, t }: any) {
         style={{ x, y, rotateX: springRotateX, rotateY: springRotateY, transformPerspective: 1200 }}
     >
       <TiltCard className="w-64 h-auto block select-none group">
-        <div className="w-full bg-white p-3 shadow-2xl border-4 border-black rounded-xl flex flex-col relative pointer-events-none select-none transform-gpu" style={{ transformStyle: 'preserve-3d' }}>
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#FFCC00] px-4 py-1 border-4 border-black rounded-full font-black text-[10px] uppercase shadow-[4px_4px_0_0_#000] z-50 animate-bounce" style={{ transform: 'translateZ(30px)' }}>
+        <div className={`w-full p-3 shadow-2xl border-4 rounded-xl flex flex-col relative pointer-events-none select-none transform-gpu ${isDark ? 'bg-zinc-800 border-gray-600 text-white' : 'bg-white border-black text-black'}`} style={{ transformStyle: 'preserve-3d' }}>
+          <div className={`absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#FFCC00] text-black px-4 py-1 border-4 rounded-full font-black text-[10px] uppercase shadow-[4px_4px_0_0_#000] z-50 animate-bounce ${isDark ? 'border-gray-600' : 'border-black'}`} style={{ transform: 'translateZ(30px)' }}>
               {t.dragUp} <ArrowUpCircle size={14} />
           </div>
-          <div className="w-full aspect-square bg-gray-100 border-4 border-black overflow-hidden flex items-center justify-center relative rounded-md" style={{ transform: 'translateZ(10px)' }}>
+          <div className={`w-full aspect-square border-4 overflow-hidden flex items-center justify-center relative rounded-md ${isDark ? 'bg-zinc-700 border-gray-600' : 'bg-gray-100 border-black'}`} style={{ transform: 'translateZ(10px)' }}>
             <img src={pendingImage.url} alt="Generated" className="w-full h-full object-cover" />
           </div>
-          <div className="mt-3 flex flex-col items-center justify-center text-black pb-2" style={{ transform: 'translateZ(20px)' }}>
+          <div className="mt-3 flex flex-col items-center justify-center pb-2" style={{ transform: 'translateZ(20px)' }}>
             <p className="text-sm font-bold truncate px-2 w-full text-center leading-tight">
               {pendingImage.prompt || t.doodle}
             </p>
@@ -560,7 +641,7 @@ function DraggablePendingPhoto({ pendingImage, handleDragEnd, t }: any) {
   );
 }
 
-function GalleryPhoto({ item, initialZ, onImageClick }: { key?: string; item: GalleryItem, initialZ: number, onImageClick: (item: GalleryItem) => void }) {
+function GalleryPhoto({ item, initialZ, onImageClick, isDark }: { key?: string; item: GalleryItem, initialZ: number, onImageClick: (item: GalleryItem) => void, isDark?: boolean }) {
   const [zIndex, setZIndex] = useState(initialZ);
   
   const x = useMotionValue(window.innerWidth / 2 - 100);
@@ -597,14 +678,14 @@ function GalleryPhoto({ item, initialZ, onImageClick }: { key?: string; item: Ga
         }}
         className="w-64 h-auto cursor-grab active:cursor-grabbing origin-center"
     >
-        <div className="w-full bg-white p-3 shadow-[8px_8px_0_0_rgba(0,0,0,0.3)] border-4 border-black flex flex-col relative rounded-xl transform-gpu" style={{ transformStyle: 'preserve-3d' }}>
+        <div className={`w-full p-3 shadow-[8px_8px_0_0_rgba(0,0,0,0.3)] border-4 flex flex-col relative rounded-xl transform-gpu ${isDark ? 'bg-zinc-800 border-gray-600' : 'bg-white border-black'}`} style={{ transformStyle: 'preserve-3d' }}>
             {/* Duct tape */}
-            <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-16 h-8 bg-gray-200/90 border-2 border-black rotate-[-5deg] mix-blend-multiply z-20" style={{ transform: 'translateZ(10px)' }}></div>
+            <div className={`absolute -top-5 left-1/2 -translate-x-1/2 w-16 h-8 border-2 rotate-[-5deg] mix-blend-multiply z-20 ${isDark ? 'bg-gray-400/90 border-gray-600' : 'bg-gray-200/90 border-black'}`} style={{ transform: 'translateZ(10px)' }}></div>
 
-            <div className="w-full aspect-square bg-gray-100 border-4 border-black overflow-hidden flex items-center justify-center relative rounded-md pointer-events-none" style={{ transform: 'translateZ(5px)' }}>
+            <div className={`w-full aspect-square border-4 overflow-hidden flex items-center justify-center relative rounded-md pointer-events-none ${isDark ? 'bg-zinc-700 border-gray-600' : 'bg-gray-100 border-black'}`} style={{ transform: 'translateZ(5px)' }}>
             <img src={item.url} draggable={false} alt={item.prompt} className="w-full h-full object-cover" />
             </div>
-            <div className="mt-3 flex flex-col items-center justify-center text-black pb-2 pointer-events-none" style={{ transform: 'translateZ(15px)' }}>
+            <div className={`mt-3 flex flex-col items-center justify-center pb-2 pointer-events-none ${isDark ? 'text-white' : 'text-black'}`} style={{ transform: 'translateZ(15px)' }}>
             <p className="text-lg font-black truncate px-2 w-full text-center leading-tight">
                 {item.prompt}
             </p>
