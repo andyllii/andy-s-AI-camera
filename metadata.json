@@ -1,6 +1,8 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Andy's AI Camera",
+  "description": "An AI-powered camera and image generation tool using Gemini",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
