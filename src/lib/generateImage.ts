@@ -22,9 +22,19 @@ export async function generateImage(params: {
      const { GoogleGenAI } = await import('@google/genai');
      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
      
+     const w = parseInt(width) || 1024;
+     const h = parseInt(height) || 1024;
+     const ratio = w / h;
      let aspectRatio = '1:1';
-     if (imageSize === '1024x576') aspectRatio = '16:9';
-     if (imageSize === '576x1024') aspectRatio = '9:16';
+     if (Math.abs(ratio - (16 / 9)) < 0.1) {
+         aspectRatio = '16:9';
+     } else if (Math.abs(ratio - (9 / 16)) < 0.1) {
+         aspectRatio = '9:16';
+     } else if (Math.abs(ratio - (4 / 3)) < 0.1) {
+         aspectRatio = '4:3';
+     } else if (Math.abs(ratio - (3 / 4)) < 0.1) {
+         aspectRatio = '3:4';
+     }
      
      const parts: any[] = [];
      if (baseImages.length > 0) {

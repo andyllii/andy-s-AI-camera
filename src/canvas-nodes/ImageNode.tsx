@@ -1,11 +1,18 @@
 import React, { useRef, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Download, Trash2, Upload, Loader2 } from 'lucide-react';
+import { useLongPress } from '../hooks/useLongPress';
 
 export function ImageNode({ data, isConnectable, id }: any) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const longPressHandlers = useLongPress(() => {
+    if (data.onLongPress) {
+      data.onLongPress(id, 'imageNode');
+    }
+  });
 
   const processFile = async (file: File) => {
     if (!file) return;
@@ -77,7 +84,9 @@ export function ImageNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className={`bg-[#2a2a2a] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] border-2 w-64 group transition-colors ${isDragOver ? 'border-[#FFCC00]' : 'border-[#555]'}`}>
+    <div 
+      {...longPressHandlers}
+      className={`bg-[#2a2a2a] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] border-2 w-64 group transition-colors cursor-pointer select-none active:brightness-95 ${isDragOver ? 'border-[#FFCC00]' : 'border-[#555]'}`}>
       <Handle 
         type="target" 
         position={Position.Left} 

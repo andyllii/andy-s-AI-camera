@@ -1,9 +1,19 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
+import { useLongPress } from '../hooks/useLongPress';
 
 export function TextNode({ data, isConnectable, id }: any) {
+  const longPressHandlers = useLongPress(() => {
+    if (data.onLongPress) {
+      data.onLongPress(id, 'textNode');
+    }
+  });
+
   return (
-    <div className="bg-[#2a2a2a] text-white rounded-xl shadow-lg border-2 border-gray-600 outline-none w-64 min-h-[100px] flex flex-col group p-3">
+    <div 
+      {...longPressHandlers}
+      className="bg-[#2a2a2a] text-white rounded-xl shadow-lg border-2 border-gray-600 outline-none w-64 min-h-[100px] flex flex-col group p-3 cursor-pointer select-none active:brightness-95"
+    >
       {/* Target handle on left */}
       <Handle 
         type="target" 

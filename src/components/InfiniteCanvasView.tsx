@@ -55,6 +55,11 @@ function CanvasContent({
   const reactFlowInstance = useReactFlow();
   const [clipboard, setClipboard] = useState<{nodes: Node[], edges: Edge[]}>({nodes: [], edges: []});
   const [showMinimap, setShowMinimap] = useState(true);
+  const [longPressedNode, setLongPressedNode] = useState<{ id: string; type: string } | null>(null);
+
+  const handleNodeLongPress = useCallback((id: string, type: string) => {
+    setLongPressedNode({ id, type });
+  }, []);
 
   useEffect(() => {
     store.loadProjects();
@@ -221,9 +226,9 @@ function CanvasContent({
 
 
   const processedNodes = store.nodes.map(n => {
-    if (n.type === 'textNode') return { ...n, data: { ...n.data, onChange: handleNodeChange } };
-    if (n.type === 'generateNode') return { ...n, data: { ...n.data, onChange: handleNodeChange, onGenerate: handleGenerateClick } };
-    if (n.type === 'imageNode') return { ...n, data: { ...n.data, onChange: handleNodeChange } };
+    if (n.type === 'textNode') return { ...n, data: { ...n.data, onChange: handleNodeChange, onLongPress: handleNodeLongPress } };
+    if (n.type === 'generateNode') return { ...n, data: { ...n.data, onChange: handleNodeChange, onGenerate: handleGenerateClick, onLongPress: handleNodeLongPress } };
+    if (n.type === 'imageNode') return { ...n, data: { ...n.data, onChange: handleNodeChange, onLongPress: handleNodeLongPress } };
     return n;
   });
 
@@ -394,6 +399,82 @@ function CanvasContent({
           <SettingsIcon size={20} />
         </button>
       </div>
+
+      {/* Touch-Friendly Contextual Selection Bar for Nodes */}
+      {longPressedNode && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-end sm:items-center justify-center p-4" onClick={() => setLongPressedNode(null)}>
+          <div 
+            className="w-full max-w-sm bg-[#1e1e1e] border-2 border-[#444] rounded-2xl shadow-2xl overflow-hidden p-5 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-5 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#333] pb-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-widest text-[#FFCC00] font-black font-mono">
+                  {lang === 'en' ? 'Node Actions' : '節點操作'}
+                </span>
+                <span className="text-white font-bold text-base mt-0.5">
+                  {longPressedNode.type === 'textNode' && (lang === 'en' ? 'Prompt Text Node' : '文字提示節點')}
+                  {longPressedNode.type === 'imageNode' && (lang === 'en' ? 'Image Asset Node' : '圖片素材節點')}
+                  {longPressedNode.type === 'generateNode' && (lang === 'en' ? 'Generator Configuration' : 'AI 生成設定節點')}
+                </span>
+              </div>
+              <button 
+                onClick={() => setLongPressedNode(null)}
+                className="text-gray-400 hover:text-white p-2 hover:bg-[#333] rounded-lg transition-all font-black text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+              {lang === 'en' 
+                ? 'Select an action to apply to this node on the canvas.' 
+                : '請選擇要對此畫布節點執行的動作。'}
+            </p>
+
+            <div className="flex flex-col gap-2.5 mt-2">
+              <button
+                onClick={() => {
+                  if (longPressedNode) {
+                    const nodeId = longPressedNode.id;
+                    // Delete node itself
+                    store.setNodes(store.nodes.filter(n => n.id !== nodeId));
+                    // Disconnect edges
+                    store.setEdges(store.edges.filter(e => e.source !== nodeId && e.target !== nodeId));
+                    setLongPressedNode(null);
+                  }
+                }}
+                className="w-full h-12 bg-red-950/50 hover:bg-red-650 border border-red-800/60 hover:border-red-500 text-red-200 hover:text-white flex items-center justify-center gap-2.5 rounded-xl font-extrabold text-sm transition-all duration-150 active:scale-95"
+              >
+                <Trash2 size={16} />
+                <span>{lang === 'en' ? 'Delete Item' : '刪除此項目'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (longPressedNode) {
+                    const nodeId = longPressedNode.id;
+                    // Just disconnect edges
+                    store.setEdges(store.edges.filter(e => e.source !== nodeId && e.target !== nodeId));
+                    setLongPressedNode(null);
+                  }
+                }}
+                className="w-full h-12 bg-amber-950/40 hover:bg-amber-650 border border-amber-900/40 hover:border-amber-500 text-amber-200 hover:text-white flex items-center justify-center gap-2.5 rounded-xl font-extrabold text-sm transition-all duration-150 active:scale-95"
+              >
+                <Workflow size={16} />
+                <span>{lang === 'en' ? 'Disconnect Connections' : '中斷所有連接'}</span>
+              </button>
+
+              <button
+                onClick={() => setLongPressedNode(null)}
+                className="w-full h-12 bg-zinc-800 hover:bg-zinc-700 text-gray-300 hover:text-white flex items-center justify-center rounded-xl font-bold text-sm transition-all duration-150 active:scale-95 mt-1"
+              >
+                <span>{lang === 'en' ? 'Cancel' : '取消'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
