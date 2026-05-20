@@ -5,7 +5,12 @@ export function TextNode({ data, isConnectable, id }: any) {
   return (
     <div className="bg-[#2a2a2a] text-white rounded-xl shadow-lg border-2 border-gray-600 outline-none w-64 min-h-[100px] flex flex-col group p-3">
       {/* Target handle on left */}
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} className="w-3 h-3 bg-gray-400" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        isConnectable={isConnectable} 
+        className="!w-4 !h-4 !bg-[#FFCC00] hover:!scale-150 !border-2 !border-zinc-800 transition-all cursor-pointer shadow-md" 
+      />
       
       <div className="flex-1 w-full h-full">
          <textarea 
@@ -19,7 +24,13 @@ export function TextNode({ data, isConnectable, id }: any) {
       </div>
 
       {/* Source handle on right */}
-      <Handle type="source" position={Position.Right} id="a" isConnectable={isConnectable} className="w-3 h-3 bg-gray-400" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        id="a" 
+        isConnectable={isConnectable} 
+        className="!w-4 !h-4 !bg-[#FFCC00] hover:!scale-150 !border-2 !border-zinc-800 transition-all cursor-pointer shadow-md" 
+      />
     </div>
   );
 }

@@ -78,7 +78,12 @@ export function ImageNode({ data, isConnectable, id }: any) {
 
   return (
     <div className={`bg-[#2a2a2a] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] border-2 w-64 group transition-colors ${isDragOver ? 'border-[#FFCC00]' : 'border-[#555]'}`}>
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} className="w-3 h-3 bg-gray-400" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        isConnectable={isConnectable} 
+        className="!w-4 !h-4 !bg-[#FFCC00] hover:!scale-150 !border-2 !border-zinc-800 transition-all cursor-pointer shadow-md" 
+      />
       
       <input 
         type="file" 
@@ -155,7 +160,13 @@ export function ImageNode({ data, isConnectable, id }: any) {
          </div>
       )}
 
-      <Handle type="source" position={Position.Right} id="a" isConnectable={isConnectable} className="w-3 h-3 bg-gray-400" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        id="a" 
+        isConnectable={isConnectable} 
+        className="!w-4 !h-4 !bg-[#FFCC00] hover:!scale-150 !border-2 !border-zinc-800 transition-all cursor-pointer shadow-md" 
+      />
     </div>
   );
 }

@@ -43,7 +43,7 @@ export default function App() {
       )}
 
       {/* Top Nav */}
-      <nav className={`absolute top-0 left-0 right-0 p-4 md:p-6 flex flex-col sm:flex-row justify-between items-center z-50 pointer-events-none gap-4 ${currentView === 'canvas' ? 'hidden sm:flex' : ''}`}>
+      <nav className={`absolute top-0 left-0 right-0 p-4 md:p-6 flex flex-col sm:flex-row justify-between items-center z-50 pointer-events-none gap-4 ${currentView === 'canvas' ? 'hidden' : ''}`}>
         <div className={`font-black text-xl md:text-3xl tracking-tighter uppercase border-4 px-3 py-1 md:px-4 md:py-2 backdrop-blur-md rotate-[-2deg] pointer-events-auto flex items-center gap-2 ${isDark ? 'bg-zinc-800/80 border-gray-500 shadow-[4px_4px_0_0_#6b7280]' : 'bg-white/80 border-black shadow-[4px_4px_0_0_#000]'}`}>
           {lang === 'en' ? 'Draw & Generate!' : '繪圖與生成！'}
         </div>
@@ -120,7 +120,18 @@ export default function App() {
         </main>
       ) : (
         <main className="flex-1 w-full h-screen relative">
-           <InfiniteCanvasView apiUrl={apiUrl} apiKey={apiKey} enableUpload={enableUpload} />
+           <InfiniteCanvasView 
+              apiUrl={apiUrl} 
+              apiKey={apiKey} 
+              enableUpload={enableUpload}
+              currentView={currentView}
+              setCurrentView={setCurrentView}
+              lang={lang}
+              setLang={setLang}
+              theme={theme}
+              setTheme={setTheme}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+           />
         </main>
       )}
 

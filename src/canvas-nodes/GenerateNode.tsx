@@ -18,7 +18,12 @@ export function GenerateNode({ data, isConnectable, id }: any) {
 
   return (
     <div className="bg-[#222] text-white rounded-xl shadow-[0_10px_40px_rgb(0,0,0,0.8)] border border-gray-600 w-[280px] flex flex-col p-4 z-50">
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} className="w-3 h-3 bg-gray-400" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        isConnectable={isConnectable} 
+        className="!w-4 !h-4 !bg-[#FFCC00] hover:!scale-150 !border-2 !border-zinc-800 transition-all cursor-pointer shadow-md" 
+      />
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-sm">Generate Config</h3>
@@ -77,7 +82,13 @@ export function GenerateNode({ data, isConnectable, id }: any) {
         </button>
       </div>
 
-      <Handle type="source" position={Position.Right} id="a" isConnectable={isConnectable} className="w-3 h-3 bg-gray-400" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        id="a" 
+        isConnectable={isConnectable} 
+        className="!w-4 !h-4 !bg-[#FFCC00] hover:!scale-150 !border-2 !border-zinc-800 transition-all cursor-pointer shadow-md" 
+      />
     </div>
   );
 }
