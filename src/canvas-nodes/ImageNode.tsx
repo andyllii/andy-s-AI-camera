@@ -8,7 +8,7 @@ export function ImageNode({ data, isConnectable, id }: any) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const longPressHandlers = useLongPress(() => {
+  const { ref } = useLongPress(() => {
     if (data.onLongPress) {
       data.onLongPress(id, 'imageNode');
     }
@@ -85,7 +85,7 @@ export function ImageNode({ data, isConnectable, id }: any) {
 
   return (
     <div 
-      {...longPressHandlers}
+      ref={ref}
       className={`bg-[#2a2a2a] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] border-2 w-64 group transition-colors cursor-pointer select-none active:brightness-95 ${isDragOver ? 'border-[#FFCC00]' : 'border-[#555]'}`}>
       <Handle 
         type="target" 

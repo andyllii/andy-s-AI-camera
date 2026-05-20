@@ -3,7 +3,7 @@ import { Handle, Position } from 'reactflow';
 import { useLongPress } from '../hooks/useLongPress';
 
 export function TextNode({ data, isConnectable, id }: any) {
-  const longPressHandlers = useLongPress(() => {
+  const { ref } = useLongPress(() => {
     if (data.onLongPress) {
       data.onLongPress(id, 'textNode');
     }
@@ -11,7 +11,7 @@ export function TextNode({ data, isConnectable, id }: any) {
 
   return (
     <div 
-      {...longPressHandlers}
+      ref={ref}
       className="bg-[#2a2a2a] text-white rounded-xl shadow-lg border-2 border-gray-600 outline-none w-64 min-h-[100px] flex flex-col group p-3 cursor-pointer select-none active:brightness-95"
     >
       {/* Target handle on left */}

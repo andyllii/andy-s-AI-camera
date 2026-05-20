@@ -9,7 +9,7 @@ export function GenerateNode({ data, isConnectable, id }: any) {
   const currentRatioVal = data.aspectRatio || '1024x1024';
   const isCustom = !presets.includes(currentRatioVal);
 
-  const longPressHandlers = useLongPress(() => {
+  const { ref } = useLongPress(() => {
     if (data.onLongPress) {
       data.onLongPress(id, 'generateNode');
     }
@@ -51,7 +51,7 @@ export function GenerateNode({ data, isConnectable, id }: any) {
 
   return (
     <div 
-      {...longPressHandlers}
+      ref={ref}
       className="bg-[#222] text-white rounded-xl shadow-[0_10px_40px_rgb(0,0,0,0.8)] border border-gray-600 w-[280px] flex flex-col p-4 z-50 cursor-pointer select-none active:brightness-95"
     >
       <Handle 
