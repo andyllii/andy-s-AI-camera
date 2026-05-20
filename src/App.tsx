@@ -32,7 +32,7 @@ export default function App() {
   const isDark = theme === 'dark' || currentView === 'canvas'; // Canvas is always dark mode usually
 
   return (
-    <div className={`min-h-[100dvh] lg:h-screen w-full font-sans overflow-x-hidden overflow-y-auto lg:overflow-hidden flex flex-col selection:bg-[#FFCC00] selection:text-black relative z-0 ${isDark ? 'bg-zinc-900 text-white' : 'bg-[#f9f7f2] text-black'} ${currentView === 'canvas' ? 'm-0 p-0 overflow-hidden' : ''}`}>
+    <div className={`w-full font-sans flex flex-col selection:bg-[#FFCC00] selection:text-black relative z-0 ${isDark ? 'bg-zinc-900 text-white' : 'bg-[#f9f7f2] text-black'} ${currentView === 'canvas' ? 'h-[100dvh] overflow-hidden m-0 p-0' : 'min-h-[100dvh] lg:h-screen overflow-x-hidden overflow-y-auto lg:overflow-hidden'}`}>
       {/* Blurred Aesthetic Background */}
       {currentView === 'standard' && (
         <>
@@ -119,7 +119,7 @@ export default function App() {
           />
         </main>
       ) : (
-        <main className="flex-1 w-full h-screen relative">
+        <main className="flex-1 w-full h-full relative overflow-hidden">
            <InfiniteCanvasView 
               apiUrl={apiUrl} 
               apiKey={apiKey} 

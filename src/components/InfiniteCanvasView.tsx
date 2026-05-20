@@ -237,6 +237,7 @@ function CanvasContent({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
+        preventScrolling={true}
         connectionMode={ConnectionMode.Loose}
         defaultEdgeOptions={{
            style: { stroke: '#b1b1b7', strokeWidth: 2 },
@@ -244,7 +245,7 @@ function CanvasContent({
         }}
         className="bg-[#1e1e1e]"
       >
-        <Controls className="!bg-zinc-800 !border-2 !border-zinc-700/50 !rounded-xl !shadow-2xl text-white hidden sm:block" />
+        <Controls className="!bg-zinc-800 !border-2 !border-zinc-700/50 !rounded-xl !shadow-2xl text-white !bottom-24 !left-4" />
         {showMinimap && (
           <MiniMap 
             nodeStrokeColor={() => '#555'} 
@@ -259,7 +260,7 @@ function CanvasContent({
       {/* Modern HUD Header Bar - fully responsive & touch friendly */}
       <div className="absolute top-4 left-4 right-4 z-50 pointer-events-none flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
         {/* Left HUD: Project Name Selector + Rename & Delete controls */}
-        <div className="pointer-events-auto flex flex-row items-center gap-2 bg-[#2d2d2d]/95 backdrop-blur-md border border-[#444] rounded-2xl p-2 shadow-2xl w-full xl:w-auto overflow-x-auto select-none">
+        <div className="pointer-events-auto flex flex-row items-center gap-2 bg-[#2d2d2d]/95 backdrop-blur-md border border-[#444] rounded-2xl p-2 shadow-2xl w-full xl:w-auto overflow-x-auto no-scrollbar select-none">
           <div className="flex items-center gap-1.5 shrink-0 px-2 text-white font-extrabold text-[10px] sm:text-xs tracking-wider uppercase opacity-40">
             {lang === 'en' ? 'Canvas' : '畫布'}
           </div>
@@ -310,7 +311,7 @@ function CanvasContent({
         </div>
 
         {/* Right HUD: System Controls & Mode Switchers (Horizontally scrolls if narrow) */}
-        <div className="pointer-events-auto flex flex-row items-center justify-between xl:justify-end gap-2 bg-[#2d2d2d]/95 backdrop-blur-md border border-[#444] rounded-2xl p-2 shadow-2xl w-full xl:w-auto overflow-x-auto select-none">
+        <div className="pointer-events-auto flex flex-row items-center justify-between xl:justify-end gap-2 bg-[#2d2d2d]/95 backdrop-blur-md border border-[#444] rounded-2xl p-2 shadow-2xl w-full xl:w-auto overflow-x-auto no-scrollbar select-none">
           {/* View Segment Modes - 44px high targets */}
           <div className="flex items-center p-1 bg-[#1e1e1e] border border-[#444] rounded-xl shrink-0 h-11">
             <button 
